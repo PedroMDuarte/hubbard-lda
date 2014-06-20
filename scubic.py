@@ -479,7 +479,7 @@ class sc( udipole.potential) :
 
 
 
-def get_max_comp( pot, aS, T ): 
+def get_max_comp( pot, aS, T, verbose ): 
     """ 
     This function gets the maximum amount of compensation that will
     be tolerated by a setup.   
@@ -512,14 +512,14 @@ def get_max_comp( pot, aS, T ):
     # First find the depth of the band at the origin
     bandOrigin = -3.*s0 + ( bands3dvec( np.array([s0,s0,s0]) )[0] + 
                    bands3dvec( np.array([s0,s0,s0]) )[1] )/2.
-
-    print "bandOrigin = %.2f"% bandOrigin 
-
-    band100 =  bandOrigin / 3. 
-    print "band100 = %.2f" % band100
+    band100 =  bandOrigin / 3.
+    if verbose: 
+        print "bandOrigin = %.2f"% bandOrigin 
+        print "band100 = %.2f" % band100
     
-    U  = onsite( np.array([s0,s0,s0]) ) * aS 
-    print U/4.
+    U  = onsite( np.array([s0,s0,s0]) ) * aS
+    if verbose: 
+        print U/4.
 
     if wL <= wG:   # alpha < 1
         # 

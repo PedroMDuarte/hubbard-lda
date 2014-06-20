@@ -2,4 +2,12 @@ QMCdataforLDA/
 QMCdataforLDA
 *.pyc
 *.swp
-
+*.tar.gz
+NLCE8/
+NLCE8
+NLCE8_All/
+NLCE8_All
+NLCE8_AvgExtrp/
+NLCE8_AvgExtrp
+QMCdatacopy/
+QMCdatacopy

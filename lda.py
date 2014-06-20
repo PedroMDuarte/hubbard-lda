@@ -89,6 +89,47 @@ from scipy.interpolate import interp1d
 
 # Load up the HTSE solutions 
 from htse import htse_dens, htse_doub, htse_entr
+from nlce import nlce_dens, nlce_entr, nlce_spi
+
+import qmc, qmc_spi 
+
+
+
+def get_dens( T, t, mu, U, select='htse', ignoreLowT=False, verbose=True):
+    """ This function packages all three methods for obtaining
+    the thermodynamic quantities: htse, nlce, qmc"""
+    if select == 'htse':
+        return htse_dens( T, t, mu, U, ignoreLowT=ignoreLowT, verbose=verbose)
+    elif select == 'nlce':
+        return nlce_dens( T, t, mu, U, ignoreLowT=ignoreLowT, verbose=verbose)
+    
+
+def get_entr( T, t, mu, U, select='htse', ignoreLowT=False, verbose=True):
+    """ This function packages all three methods for obtaining
+    the thermodynamic quantities: htse, nlce, qmc"""
+    if select == 'htse':
+        return htse_entr( T, t, mu, U, ignoreLowT=ignoreLowT, verbose=verbose)
+    elif select == 'nlce':
+        return nlce_entr( T, t, mu, U, ignoreLowT=ignoreLowT, verbose=verbose)
+
+def get_spi( T, t, mu, U, select='htse', ignoreLowT=False, verbose=True):
+    """ This function packages all three methods for obtaining
+    the thermodynamic quantities: htse, nlce, qmc"""
+    if select == 'htse':
+        return np.ones_like( t ) 
+    elif select == 'nlce':
+        return nlce_spi( T, t, mu, U, ignoreLowT=ignoreLowT, verbose=verbose)
+ 
+
+def get_doub( T, t, mu, U, select='htse', ignoreLowT=False, verbose=True):
+    """ This function packages all three methods for obtaining
+    the thermodynamic quantities: htse, nlce, qmc"""
+    if select == 'htse':
+        return htse_dens( T, t, mu, U, ignoreLowT=ignoreLowT, verbose=verbose)
+    else:
+        raise "doublons not defined" 
+
+    
 
 
 #...............
@@ -159,14 +200,26 @@ class lda:
 
         # Initialize extents
         self.extents = kwargs.pop('extents', 40.) 
+
+        # Initialize the type of Hubbard solution
+        # type can be: 'htse', 'nlce', 'qmc'
+        self.select = kwargs.get('select','htse') 
  
         # Make a cut line along 111 to calculate integrals of the
         # thermodynamic quantities
+
+        # set the number of points to use in the cut 
+        if self.select == 'htse':
+            NPOINTS = 320 
+        else:
+            NPOINTS = 80
+
         direc111 = (np.arctan(np.sqrt(2)), np.pi/4)
         unit = vec3(); th = direc111[0]; ph = direc111[1] 
         unit.set_spherical( 1., th, ph); 
         t111, self.X111, self.Y111, self.Z111, lims = \
-            udipole.linecut_points( direc=direc111, extents=self.extents)
+            udipole.linecut_points( direc=direc111, extents=self.extents,\
+            npoints=NPOINTS)
         # Below we get the signed distance from the origin
         self.r111 =  self.X111*unit[0] + self.Y111*unit[1] + self.Z111*unit[2]
 
@@ -224,7 +277,8 @@ class lda:
             # units of the tunneling
             self.globalMu = kwargs.get('globalMu', 0.15)
             if  self.globalMu == 'halfMott':
-                self.globalMu = self.onsite_111.max()/2.
+                self.globalMu = self.onsite_111.max()/2.  \
+                                + kwargs.get('halfMottPlus',0.)
         else :
             self.Number = kwargs.get('Natoms', 3e5)
             fN = lambda x : self.getNumber(x,self.T, verbose=False)- self.Number
@@ -280,7 +334,7 @@ class lda:
 
         if self.verbose:
             #This obtains the value of g0, careful when using anisotropic params
-            scubic.get_max_comp( self.pot, 650., self.T  )  
+            scubic.get_max_comp( self.pot, 650., self.T, verbose=False)  
 
 
         #------------------------------------------------
@@ -408,7 +462,6 @@ class lda:
 
         # Obtain trap integrated values of the thermodynamic quantities
         self.Number  = self.getNumber( self.globalMu, self.T )
-        self.NumberD = self.getNumberD( self.T )
         self.Entropy = self.getEntropy( self.T)
 
  
@@ -443,6 +496,8 @@ class lda:
         waists = sum( wLs, ())
         wL = np.mean(waists)  
 
+        self.NumberD = self.getNumberD( self.T )
+
         rlabel = r'$\mathrm{HWHM} = %.2f\,w_{L}$' % ( self.getRadius()/wL  )  
         Nlabel = r'$N=%.2f\times 10^{5}$' % (self.Number/1e5)
         Dlabel = r'$D=%.3f$' % ( self.NumberD / self.Number )
@@ -461,8 +516,9 @@ class lda:
 
         gMuZero = self.Ezero0_111 + gMu
         localMu = gMuZero - self.Ezero_111
-        density = htse_dens( T, self.tunneling_111, localMu, \
-                      self.onsite_111, ignoreLowT=self.ignoreLowT, \
+        density = get_dens( T, self.tunneling_111, localMu, \
+                      self.onsite_111, select=self.select,\
+                      ignoreLowT=self.ignoreLowT, \
                       verbose=self.verbose)
         posradii = self.r111 >= 0. 
         r111pos = self.r111[ posradii]  
@@ -479,7 +535,7 @@ class lda:
 
     def getDensity( self, gMu, T ):
         """
-        This function calculates and returns the column density along
+        This function calculates and returns the density along
         the 111 direction  
 
         Parameters 
@@ -490,10 +546,66 @@ class lda:
         gMuZero = self.Ezero0_111 + gMu
         localMu = gMuZero - self.Ezero_111
         localMu_t = localMu / self.tunneling_111
-        density = htse_dens( T, self.tunneling_111, localMu, \
-                      self.onsite_111, ignoreLowT=self.ignoreLowT, \
+        density = get_dens( T, self.tunneling_111, localMu, \
+                      self.onsite_111, select=self.select,\
+                      ignoreLowT=self.ignoreLowT, \
                       verbose=self.verbose)
         return self.r111 ,  density
+
+    def getEntropy111( self, gMu, T ):
+        """
+        This function calculates and returns the entropy along
+        the 111 direction  
+
+        Parameters 
+        ----------
+        gMu         :  global chemical potential
+ 
+        """
+        gMuZero = self.Ezero0_111 + gMu
+        localMu = gMuZero - self.Ezero_111
+        localMu_t = localMu / self.tunneling_111
+        entropy = get_entr( T, self.tunneling_111, localMu, \
+                      self.onsite_111, select=self.select,\
+                      ignoreLowT=self.ignoreLowT, \
+                      verbose=self.verbose)
+        return self.r111 ,  entropy
+ 
+    def getSpi111( self, gMu, T ):
+        """
+        This function calculates and returns the structure factor along
+        the 111 direction  
+
+        Parameters 
+        ----------
+        gMu         :  global chemical potential
+ 
+        """
+        gMuZero = self.Ezero0_111 + gMu
+        localMu = gMuZero - self.Ezero_111
+        localMu_t = localMu / self.tunneling_111
+        spi = get_spi( T, self.tunneling_111, localMu, \
+                      self.onsite_111, select=self.select,\
+                      ignoreLowT=self.ignoreLowT, \
+                      verbose=self.verbose)
+        return self.r111 ,  spi
+
+    def getBulkSpi( self, **kwargs ):
+        r111, n111 = self.getDensity( self.globalMu, self.T )
+
+        t0 = self.tunneling_111.min() 
+        
+
+        Tspi = kwargs.get( 'Tspi', self.T / t0  )
+        Tspi = Tspi * t0
+
+        spibulk, spi =  qmc_spi.spi_bulk( r111, n111, Tspi, \
+             self.tunneling_111, self.onsite_111, **kwargs ) 
+
+        U111 = self.onsite_111 / self.tunneling_111
+
+        return spibulk, spi, r111, n111, U111, self.tunneling_111 
+
 
     def getNumber( self, gMu, T, **kwargs):
         """ 
@@ -516,8 +628,9 @@ class lda:
         gMuZero = self.Ezero0_111 + gMu
         localMu = gMuZero - self.Ezero_111
         localMu_t = localMu / self.tunneling_111
-        density = htse_dens( T, self.tunneling_111, localMu, \
-                      self.onsite_111, ignoreLowT=self.ignoreLowT, \
+        density = get_dens( T, self.tunneling_111, localMu, \
+                      self.onsite_111, select=self.select,\
+                      ignoreLowT=self.ignoreLowT, \
                       verbose=self.verbose)
 
 
@@ -605,8 +718,9 @@ class lda:
         It integrates along 111 assuming a spherically symmetric sample. 
 
         """
-        doublons = htse_doub( T, self.tunneling_111, self.localMu_111,\
-                              self.onsite_111, ignoreLowT=self.ignoreLowT,\
+        doublons = get_doub( T, self.tunneling_111, self.localMu_111,\
+                              self.onsite_111, select=self.select,\
+                              ignoreLowT=self.ignoreLowT,\
                               verbose=self.verbose) 
         doub = doublons[~np.isnan(doublons)]
         r = self.r111[~np.isnan(doublons)]
@@ -618,8 +732,9 @@ class lda:
         It integrates along 111 assuming a spherically symmetric sample. 
 
         """
-        entropy  = htse_entr( T, self.tunneling_111, self.localMu_111,\
-                              self.onsite_111, ignoreLowT=self.ignoreLowT,\
+        entropy  = get_entr( T, self.tunneling_111, self.localMu_111,\
+                              self.onsite_111, select=self.select,\
+                              ignoreLowT=self.ignoreLowT,\
                               verbose=self.verbose) 
         entr = entropy[~np.isnan(entropy)]
         r = self.r111[~np.isnan(entropy)]
@@ -729,12 +844,12 @@ def plotLine(  lda0, **kwargs):
                       
 
     # Obtain the thermodynamic quantities
-    density_XYZ = htse_dens( lda0.T, tunneling_XYZ,  localMu_XYZ, \
-                      onsite_XYZ, ignoreLowT=ignoreLowT ) 
-    doublon_XYZ = htse_doub( lda0.T, tunneling_XYZ,  localMu_XYZ, \
-                      onsite_XYZ, ignoreLowT=ignoreLowT ) 
-    entropy_XYZ = htse_entr( lda0.T, tunneling_XYZ,  localMu_XYZ, \
-                      onsite_XYZ, ignoreLowT=ignoreLowT )
+    density_XYZ = get_dens( lda0.T, tunneling_XYZ,  localMu_XYZ, \
+                      onsite_XYZ, select=lda0.select, ignoreLowT=ignoreLowT ) 
+    doublon_XYZ = get_doub( lda0.T, tunneling_XYZ,  localMu_XYZ, \
+                      onsite_XYZ, select=lda0.select, ignoreLowT=ignoreLowT ) 
+    entropy_XYZ = get_entr( lda0.T, tunneling_XYZ,  localMu_XYZ, \
+                      onsite_XYZ, select=lda0.select, ignoreLowT=ignoreLowT )
 
 
     # All the potential lines are recalculated to match the potential
@@ -1086,12 +1201,12 @@ def plotMathy(  lda0, **kwargs):
                      
 
     # Obtain the thermodynamic quantities
-    density_XYZ = htse_dens( lda0.T, tunneling_XYZ,  localMu_XYZ, \
-                      onsite_XYZ, ignoreLowT=ignoreLowT ) 
-    doublon_XYZ = htse_doub( lda0.T, tunneling_XYZ,  localMu_XYZ, \
-                      onsite_XYZ, ignoreLowT=ignoreLowT ) 
-    entropy_XYZ = htse_entr( lda0.T, tunneling_XYZ,  localMu_XYZ, \
-                      onsite_XYZ, ignoreLowT=ignoreLowT ) 
+    density_XYZ = get_dens( lda0.T, tunneling_XYZ,  localMu_XYZ, \
+                      onsite_XYZ, select=lda0.select, ignoreLowT=ignoreLowT ) 
+    doublon_XYZ = get_doub( lda0.T, tunneling_XYZ,  localMu_XYZ, \
+                      onsite_XYZ, select=lda0.select, ignoreLowT=ignoreLowT ) 
+    entropy_XYZ = get_entr( lda0.T, tunneling_XYZ,  localMu_XYZ, \
+                      onsite_XYZ, select=lda0.select, ignoreLowT=ignoreLowT ) 
 
      
     #--------------------------
@@ -1297,9 +1412,10 @@ def CheckInhomog( lda0, **kwargs ):
        It is useful to assess the degree of inhomogeneity in our system"""
     
     # Prepare the figure
-    fig = plt.figure(figsize=(8.,4.2))
+    fig = plt.figure(figsize=(9.,4.2))
     lattlabel = '\n'.join(  list( lda0.pot.Info() ) )
-    lattlabel = '\n'.join( [ i.split( r'$\mathrm{,}\ $' )[0].replace('s','v')   for i in lda0.pot.Info() ] )
+    lattlabel = '\n'.join( [ i.split( r'$\mathrm{,}\ $' )[0].replace('s','v') \
+                                 for i in lda0.pot.Info() ] )
  
     Nlabel = r'$N=%.2f\times 10^{5}$' % (lda0.Number/1e5)
     Slabel = r'$S/N=%.2fk_{\mathrm{B}}$' % ( lda0.Entropy / lda0.Number )
@@ -1319,25 +1435,33 @@ def CheckInhomog( lda0, **kwargs ):
     #   "Average Fermi-Hubbard parameters $n$, $U$, $t$, " +\
     #   "and $U/t$ are calculated in each bin (see panels 1, 3, 4, 5 )" )
     
-    gs = matplotlib.gridspec.GridSpec( 2,3, wspace=0.2,\
+    gs = matplotlib.gridspec.GridSpec( 2,4, wspace=0.18,\
              left=0.1, right=0.9, bottom=0.05, top=0.98)
     
     # Setup axes
     axn  = fig.add_subplot(gs[0,0])
-    axnInt = fig.add_subplot(gs[0,1])
-    axU  = fig.add_subplot(gs[0,2])
-    axt  = fig.add_subplot(gs[1,0])
-    axUt = fig.add_subplot(gs[1,1]) 
-    axv0 = fig.add_subplot(gs[1,2])
+    axnInt = fig.add_subplot(gs[0,3])
+    axU  = fig.add_subplot(gs[1,0])
+    axt  = fig.add_subplot(gs[1,1])
+    axUt = fig.add_subplot(gs[1,2]) 
+    axv0 = fig.add_subplot(gs[1,3])
+
+    axEntr = fig.add_subplot( gs[0,1] ) 
+    axSpi = fig.add_subplot( gs[0,2] )
 
     # Set xlim
     x0 = -40.; x1 = 40.
     axn.set_xlim( x0, x1)
+    axEntr.set_xlim( x0, x1)
+    axEntr.set_ylim( 0., 1.0)
+    axSpi.set_xlim( x0, x1)
+    axSpi.set_ylim( 0., 3.0)
+
     axnInt.set_xlim( 0., x1 )
     axU.set_xlim( x0, x1 )
     axU.set_ylim( 0., np.amax( lda0.onsite_t_111 * lda0.tunneling_111 *1.05 ) )
     axt.set_xlim( x0, x1 )
-    axt.set_ylim( 0., 0.3)
+    axt.set_ylim( 0., 0.12)
     axUt.set_xlim( x0, x1 )
     axUt.set_ylim( 0., np.amax( lda0.onsite_t_111 * 1.05 )) 
     axv0.set_xlim( x0, x1 )
@@ -1345,10 +1469,14 @@ def CheckInhomog( lda0, **kwargs ):
     lw0 = 2.5
     # Plot relevant quantities 
     r111_, density_111 = lda0.getDensity( lda0.globalMu, lda0.T )
+    r111_Entr, entropy_111 = lda0.getEntropy111( lda0.globalMu, lda0.T) 
+    r111_Spi, spi_111 = lda0.getSpi111( lda0.globalMu, lda0.T) 
     V0_111 = lda0.pot.S0( lda0.X111, lda0.Y111, lda0.Z111 ) 
 
-    # density     
+    # density, entropy and spi
     axn.plot( lda0.r111, density_111, lw=lw0 , color='black')
+    axEntr.plot( lda0.r111, entropy_111, lw=lw0 , color='black')
+    axSpi.plot( lda0.r111, spi_111, lw=lw0 , color='black')
     # U 
     axU.plot( lda0.r111, lda0.onsite_t_111 * lda0.tunneling_111 , \
                   lw=lw0, label='$U$', color='black') 
@@ -1360,7 +1488,8 @@ def CheckInhomog( lda0, **kwargs ):
  
     # Lattice depth 
     #print "shape of V0 = ", V0_111.shape
-    axv0.plot( lda0.r111, V0_111[0], lw=lw0, color='black', label='$\mathrm{Lattice\ depth}$')
+    axv0.plot( lda0.r111, V0_111[0], lw=lw0, color='black', \
+               label='$\mathrm{Lattice\ depth}$')
 
     # Band gap 
     bandgap_111 = bands = scubic.bands3dvec( V0_111, NBand=1 )[0] \
@@ -1403,7 +1532,12 @@ def CheckInhomog( lda0, **kwargs ):
         """
         # Convert the array to a function and then solve for y==yval
         yf = interp1d( x_array, y_array-yval, kind='cubic') 
-        return optimize.brentq( yf, x_array.min(), x_array.max() ) 
+        return optimize.brentq( yf, x_array.min(), x_array.max() )
+
+    def y_solve( x_array, y_array, xval ):
+        yf = interp1d( x_array, y_array, kind='cubic')
+        return yf(xval) 
+     
 
     radius1e = x_solve( lda0.r111[ lda0.r111 > 0 ] , \
                         density_111[ lda0.r111 > 0 ] , \
@@ -1411,35 +1545,49 @@ def CheckInhomog( lda0, **kwargs ):
 
    
     pos_r111 = lda0.r111[ lda0.r111 > 0 ]  
-    pos_dens111 = density_111[ lda0.r111 > 0 ] 
+    pos_dens111 = density_111[ lda0.r111 > 0 ]
+
  
-    print pos_dens111.max() 
-    cutoffs = [ 1.20, 1.05, 0.95, 0.75, 0.50, 0.25, 0.00 ]   
-    if pos_dens111.max() < 1.20 :
-        cutoffs = cutoffs[1:] 
-    if pos_dens111.max() < 1.05 : 
-        cutoffs = cutoffs[1:]
- 
-    nrange0 = [ pos_dens111.max() ] + cutoffs[:-1] 
-    nrange1 = cutoffs 
-    print nrange0
-    print  nrange1
+    #slice_type = 'defined_bins'
+    slice_type = 'percentage'
+    
+    if slice_type == 'defined_bins':
+        print pos_dens111.max() 
+        cutoffs = [ 1.20, 1.05, 0.95, 0.75, 0.50, 0.25, 0.00 ]   
+        if pos_dens111.max() < 1.20 :
+            cutoffs = cutoffs[1:] 
+        if pos_dens111.max() < 1.05 : 
+            cutoffs = cutoffs[1:]
+     
+        nrange0 = [ pos_dens111.max() ] + cutoffs[:-1] 
+        nrange1 = cutoffs 
+        print nrange0
+        print  nrange1
+    
+        rbins = [] 
+        for i in range(len(nrange1)-1):
+            if np.any( pos_dens111 > nrange1[i] ): 
+                rbins.append(( (nrange1[i] + nrange0[i])/2., \
+                              x_solve( pos_r111, pos_dens111, nrange1[i] ) ))
+        print rbins
+        rcut = [ b[1] for b in rbins ] 
+        print " Bins cut radii = ", rcut
+  
+    elif slice_type == 'percentage':
+        # Find the various radii that split the cloud into slots of 20% atom number
+        rcut = []
+        nrange0 = [ pos_dens111[0] ]
+        nrange1 = [] 
+        for Ncut in [0.2, 0.4, 0.6, 0.8 ]:
+            sol = x_solve( radii, NInt, Ncut )
+            rcut.append( sol  )
+            
+            denssol =  y_solve( pos_r111, pos_dens111,  sol )
+            nrange0.append( denssol )  
+            nrange1.append( denssol ) 
+        nrange1.append(0.)
+            
 
-    rbins = [] 
-    for i in range(len(nrange1)-1):
-        if np.any( pos_dens111 > nrange1[i] ): 
-            rbins.append(( (nrange1[i] + nrange0[i])/2., \
-                          x_solve( pos_r111, pos_dens111, nrange1[i] ) ))
-    print rbins
-
-    #-obsolete
-    ## Find the various radii that split the cloud into slots of 20% atom number
-    #rcut = []
-    #for Ncut in [0.2, 0.4, 0.6, 0.8 ]:
-    #    rcut.append( x_solve( radii, NInt, Ncut ) )
-
-    rcut = [ b[1] for b in rbins ] 
-    print " Bins cut radii = ", rcut
 
     # get the number of atoms in each bin
     binedges = rcut + [rcut[-1]+20.]    
@@ -1449,8 +1597,12 @@ def CheckInhomog( lda0, **kwargs ):
             Nbin.append( NRadius( binedges[b] ) ) 
         else:
             Nbin.append( NRadius(binedges[b]) - NRadius(binedges[b-1]) )
-    Nbin = np.array( Nbin ) 
-    print "Total natoms from adding bins = ", Nbin.sum() 
+    Nbin = np.array( Nbin )
+
+    Nbinsum = Nbin.sum()
+    if np.abs( Nbinsum - 1.0 ) > 0.01:
+        print "Total natoms from adding bins = ", Nbinsum
+        raise ValueError("Normalization issue with density distribution.")
     
       
 
@@ -1485,6 +1637,8 @@ def CheckInhomog( lda0, **kwargs ):
 
     # Calculate and plot the binned quantities
     dens_binned = binned( lda0.r111, density_111 ) 
+    entr_binned = binned( lda0.r111, entropy_111 ) 
+    spi_binned = binned( lda0.r111, spi_111 ) 
     Ut_binned   = binned( lda0.r111, lda0.onsite_t_111 )
     U_binned    = binned( lda0.r111, lda0.onsite_t_111 * lda0.tunneling_111 )
     t_binned    = binned( lda0.r111, lda0.tunneling_111 )
@@ -1493,6 +1647,12 @@ def CheckInhomog( lda0, **kwargs ):
     peak_t = np.amin( lda0.tunneling_111 )
     
     axn.fill_between( lda0.r111, dens_binned[0], 0., \
+                      lw=2, color='red', facecolor='red', \
+                      zorder=2, alpha=0.8)
+    axEntr.fill_between( lda0.r111, entr_binned[0], 0., \
+                      lw=2, color='red', facecolor='red', \
+                      zorder=2, alpha=0.8)
+    axSpi.fill_between( lda0.r111, spi_binned[0], 0., \
                       lw=2, color='red', facecolor='red', \
                       zorder=2, alpha=0.8)
     axUt.fill_between( lda0.r111, Ut_binned[0],  0., \
@@ -1509,11 +1669,17 @@ def CheckInhomog( lda0, **kwargs ):
     
     # Set y labels
     axn.set_ylabel(r'$n$')
+    axEntr.set_ylabel(r'$s$')
+    axSpi.set_ylabel(r'$S_{\pi}$')
     axnInt.set_ylabel(r'$N_{<R}$')
     axU.set_ylabel(r'$U\,(E_{R})$')
     axt.set_ylabel(r'$t\,(E_{R})$')
     axUt.set_ylabel(r'$U/t$')
     axv0.set_ylabel(r'$E_{R}$')
+
+    # Set y lims 
+    n_ylim =  kwargs.get('n_ylim',None)
+    if n_ylim is not None: axn.set_ylim( *n_ylim) 
    
     letters = [\
                r'\textbf{a}',\
@@ -1522,8 +1688,10 @@ def CheckInhomog( lda0, **kwargs ):
                r'\textbf{d}',\
                r'\textbf{e}',\
                r'\textbf{f}',\
+               r'\textbf{g}',\
+               r'\textbf{h}',\
               ]
-    for i,ax in enumerate([axn, axnInt, axU, axt, axUt, axv0]):
+    for i,ax in enumerate([axn, axEntr, axSpi, axnInt, axU, axt, axUt, axv0]):
         ax.text( 0.08,0.86, letters[i] , transform=ax.transAxes, fontsize=14)
         ax.yaxis.grid()
         ax.set_xlabel(r'$\mu\mathrm{m}$')
@@ -1534,10 +1702,10 @@ def CheckInhomog( lda0, **kwargs ):
                 else:
                     r2 = rcut[n+1 ]  
                 ax.axvspan( r, r2, facecolor='lightgray') 
-                if i != 1:
+                if i != 3:
                     ax.axvspan(-r2, -r, facecolor='lightgray') 
             ax.axvline( r, lw=1.0, color='gray', zorder=1 )
-            if i != 1:
+            if i != 3:
                 ax.axvline(-r, lw=1.0, color='gray', zorder=1 )
             
         ax.xaxis.set_major_locator( matplotlib.ticker.MultipleLocator(20) ) 
@@ -1557,7 +1725,7 @@ def CheckInhomog( lda0, **kwargs ):
     if kwargs.get('closefig', False):
         plt.close()
 
-    dens_set = np.array( [ b[0] for b in rbins ] + [dens_binned[1][-1]] ) 
+    #dens_set = np.array( [ b[0] for b in rbins ] + [dens_binned[1][-1]] ) 
     binresult  = np.column_stack(( 
                      np.round( Nbin, decimals=3),\
                      np.round( nrange1, decimals=3),\
@@ -1566,7 +1734,6 @@ def CheckInhomog( lda0, **kwargs ):
                      np.round( t_binned[1], decimals=3),\
                      np.round( U_binned[1], decimals=3),\
                      np.round( Ut_binned[1], decimals=3) ))
-    print
 
     from tabulate import tabulate 
     
@@ -1578,10 +1745,11 @@ def CheckInhomog( lda0, **kwargs ):
            "Mean t", \
            "Mean U", \
            "Mean U/t", ]\
-          #, tablefmt="orgtbl", floatfmt='.3f')
-          , tablefmt="latex", floatfmt='.3f')
+          , tablefmt="orgtbl", floatfmt='.3f')
+          #, tablefmt="latex", floatfmt='.3f')
 
-    print output
+    #print
+    #print output
     
     return fig, binresult,\
            peak_dens, radius1e, peak_t, output
