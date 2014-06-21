@@ -247,11 +247,15 @@ parameters.  The temperature used needs to be $T/t < 1.0$, since $n(\mu)$ is
 frozen below this temperature, the obtained density profile is good for all
 $T/t<1$. 
 
-  \item Set a value of $[T/t]_{0}$, this is the local value of $T/t$ at the center of the trap.  Use the local $n$ (from 2) along with the local $U/t$ and $T/t$ to calculate the local $S_{\pi}/n$.   
+  \item Set a value of $[T/t]_{0}$, this is the local value of $T/t$ at the
+center of the trap.  Use the local $n$ (from 2) along with the local $U/t$ and
+$T/t$ to calculate the local $S_{\pi}/n$.   
  
-  \item Integrate the local $S_{\pi}/n$ over the trap to obtain the bulk spin structure factor $\bar{S}_{\pi}$. 
+  \item Integrate the local $S_{\pi}/n$ over the trap to obtain the bulk spin
+structure factor $\bar{S}_{\pi}$. 
 
-  \item Repeat 3 and 4 for different valus of $[T/t]_{0}$ until the resulting  $\bar{S}_{\pi}$ agrees with the experimental measurement. 
+  \item Repeat 3 and 4 for different valus of $[T/t]_{0}$ until the resulting
+$\bar{S}_{\pi}$ agrees with the experimental measurement. 
 \end{enumerate}
 
 From the discussion in the previous section we have established that the
@@ -262,14 +266,33 @@ have put together a combined QMC + NLCE data set and for step 3 in the
 prescription we interpolate linearly between the available points in the data
 set in order to get $S_{\pi}/n$ at arbitrary values of $n$, $U/t$ and $T/t$.
 
-\subsection{ LDA density profiles with NLCE data}
+\subsection{ LDA density profiles with NLCE data, variation with $T$}
 
 In the experiment we varied the atom number to maximize the Bragg signal for a
-given value of $[U/t]_{0}$.   The optimal atom number obtained in the
-experiment and the trap geometry determine the global chemical potential to be
-used in the LDA.
+given value of $[U/t]_{0}$.   The optimal atom number and the trap geometry
+determine the global chemical potential to be used in the LDA to determine the
+density profile.
 
+To illustrate the effect of temperature on the density profile we show in
+Fig.~\ref{fig:dens_varyT}  density profiles with $n=1$ at the center,
+calculated for various values of $[T/t]_{0}$,  where $[T/t]_{0}$ is the local
+value of $T/t$ at the center of the cloud.  The sample is assumed to be
+isothermal so it has constant $T$ throughout, the local value of $t$ varies due
+to the size of the lattice beams.
+\begin{figure}
+    \centering
+\includegraphics[width=\textwidth]{../dataplots/Basic00/density_varyT.png}
+\caption{Density profiles with $n=1$ at the center for various values of
+$[T/t]_{0}$. For $[T/t]_{0}<1$ the density profile changes very little with
+temperature.  The right two panes show the spatial variation of $U/t$ and $T/t$
+across the sample, illustrating the degree of inhomogeneity in the system. }
+\label{fig:dens_varyT}
+\end{figure}
+As expected we se that for $[T/t]_{0} < 1 $ the density profile does not change
+very much, which validates our approach of calculating the density profile only
+once with NLCE.  See step 2 in the prescription outlined above.
 
+ 
 
 
  

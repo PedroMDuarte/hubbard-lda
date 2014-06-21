@@ -1750,7 +1750,110 @@ def CheckInhomog( lda0, **kwargs ):
 
     #print
     #print output
-    
-    return fig, binresult,\
+   
+    if kwargs.get('return_profile', False):
+        return fig, binresult,\
+           peak_dens, radius1e, peak_t, output, r111_, density_111
+    else:
+        return fig, binresult,\
            peak_dens, radius1e, peak_t, output
+
         
+def CheckInhomogSimple( lda0, **kwargs ):
+    """This function will make a plot along 111 of the density, U/t
+       and T/t 
+
+       It is useful to assess the degree of inhomogeneity in our system"""
+    
+    # Prepare the figure
+    fig = plt.figure(figsize=(9.,4.2))
+    lattlabel = '\n'.join(  list( lda0.pot.Info() ) )
+    lattlabel = '\n'.join( [ i.split( r'$\mathrm{,}\ $' )[0].replace('s','v') \
+                                 for i in lda0.pot.Info() ] )
+ 
+    Nlabel = r'$N=%.2f\times 10^{5}$' % (lda0.Number/1e5)
+    Slabel = r'$S/N=%.2fk_{\mathrm{B}}$' % ( lda0.Entropy / lda0.Number )
+    thermolabel =  '\n'.join([Nlabel, Slabel])
+
+    ldainfoA = '\n'.join(lda0.Info().split('\n')[:2])
+    ldainfoB = '\n'.join(lda0.Info().split('\n')[-2:])
+
+ 
+    fig.text( 0.05, 0.98,  lattlabel, ha='left', va='top', linespacing=1.2)
+    fig.text( 0.48, 0.98,  ldainfoA, ha='right', va='top', linespacing=1.2)
+    fig.text( 0.52, 0.98,  ldainfoB, ha='left', va='top', linespacing=1.2)
+    fig.text( 0.95, 0.98,  thermolabel, ha='right', va='top', linespacing=1.2)
+
+    gs = matplotlib.gridspec.GridSpec( 1,3, wspace=0.18,\
+             left=0.1, right=0.9, bottom=0.05, top=0.98)
+    
+    # Setup axes
+    axn  = fig.add_subplot(gs[0,0])
+    axU  = fig.add_subplot(gs[0,1])
+    axT  = fig.add_subplot(gs[0,2])
+
+
+    # Set xlim
+    x0 = -40.; x1 = 40.
+    axn.set_xlim( x0, x1)
+
+    axU.set_xlim( x0, x1 )
+    axU.set_ylim( 0., np.amax( lda0.onsite_t_111 * lda0.tunneling_111 *1.05 ) )
+    axT.set_xlim( x0, x1 )
+    axT.set_ylim( 0., 1.0)
+    
+    lw0 = 2.5
+    # Plot relevant quantities 
+    r111_, density_111 = lda0.getDensity( lda0.globalMu, lda0.T )
+
+    # density,
+    axn.plot( lda0.r111, density_111, lw=lw0 , color='black')
+    # U
+    Ut_111 = lda0.onsite_t_111 
+    axU.plot( lda0.r111, Ut_111  , \
+                  lw=lw0, label='$U$', color='black') 
+    # T
+    Tt_111 = lda0.T / lda0.tunneling_111
+    axT.plot( lda0.r111, Tt_111, lw=lw0, label='$T$', \
+                  color='black')
+ 
+    peak_dens = np.amax( density_111 )
+    peak_t = np.amin( lda0.tunneling_111 )
+    
+    # Set y labels
+    axn.set_ylabel(r'$n$')
+    axU.set_ylabel(r'$U/t$')
+    axT.set_ylabel(r'$T/t$')
+
+    # Set y lims 
+    n_ylim =  kwargs.get('n_ylim',None)
+    if n_ylim is not None: axn.set_ylim( *n_ylim) 
+   
+    letters = [\
+               r'\textbf{a}',\
+               r'\textbf{b}',\
+               r'\textbf{c}',\
+              ]
+    for i,ax in enumerate([axn, axU, axT]):
+        ax.text( 0.08,0.86, letters[i] , transform=ax.transAxes, fontsize=14)
+        ax.yaxis.grid()
+        ax.set_xlabel(r'$\mu\mathrm{m}$')
+            
+        ax.xaxis.set_major_locator( matplotlib.ticker.MultipleLocator(20) ) 
+        ax.xaxis.set_minor_locator( matplotlib.ticker.MultipleLocator(10) )
+        
+        #labels = [item.get_text() for item in ax.get_xticklabels()]
+        #print labels
+        #labels = ['' if float(l) % 40 != 0 else l for l in labels ] 
+        #ax.set_xticklabels(labels)
+
+    # Finalize figure
+    gs.tight_layout(fig, rect=[0.,0.0,1.0,0.94])
+
+    if kwargs.get('closefig', False):
+        plt.close()
+
+    if kwargs.get('return_profile', False):
+        return fig, peak_dens, peak_t, r111_, density_111, Ut_111 ,Tt_111
+    else:
+        return fig, peak_dens, peak_t

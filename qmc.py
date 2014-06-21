@@ -113,20 +113,55 @@ def find_closest_qmc( U=8, T=0.67, n=1.0, **kwargs):
     SPIERR = 4
     STHCOL = 5 
     STHERR = 6 
-    
+
+    # Control the interpolation between availble
+    # density points here 
+    #~spinterp = 'nearest' 
+    spinterp = 'linear' 
+       
+ 
     basedat = []
     for f in datfiles:
         # f[0] is the datafile name
         # f[1] is U
         # f[2] is T 
-        try:
+#        try:
             dat = np.loadtxt( f[0], skiprows=1 ) 
-            index = np.argmin( np.abs(dat[:, DENSCOL] - n )) 
-            basedat.append( [f[1], f[2], dat[index, SPICOL]] )
-        except:
-            print "Failed to get data from file = ", f
-            pass
-            #raise
+            if spinterp == 'nearest':
+                index = np.argmin( np.abs(dat[:, DENSCOL] - n )) 
+                basedat.append( [f[1], f[2], dat[index, SPICOL]] )
+            else:
+                # find the two closest densities that stride the point  
+                densdat = dat[:,DENSCOL] 
+
+                # since the densities are ordered we can do:
+                index0 = np.where( densdat <= n )[0][-1]     
+                index1 = np.where( densdat >  n )[0][0] 
+               
+                spi0 = dat[ index0, SPICOL ] 
+                spi1 = dat[ index1, SPICOL ] 
+   
+                dens0 = dat[ index0, DENSCOL ] 
+                dens1 = dat[ index1, DENSCOL ]
+
+                spiresult =  spi0 +  (n-dens0) * (spi1-spi0) / (dens1-dens0) 
+                basedat.append( [f[1], f[2], spiresult] )
+
+                print
+                print "U={:02d}, T={:0.2f}".format( int(f[1]), f[2] )
+                print "  dens = ", n
+                print "index0 = ", index0
+                print "index1 = ", index1
+                print "Doing linear interpolation for Spi"
+                print " dens0 = ", dens0
+                print " dens1 = ", dens1
+                print "  Spi0 = ", spi0
+                print "  Spi1 = ", spi1
+                print "spiresult = ", spiresult
+                raise
+#        except Exception as e :
+#            print "Failed to get data from file = ", f
+#            raise e 
 
     basedat =   np.array(basedat)
     points = _ndim_coords_from_arrays(( basedat[:,0] , basedat[:,1]))

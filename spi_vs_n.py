@@ -130,7 +130,10 @@ def plot_spis( spis,  inhomog=False):
                      fontsize=13)
     axFrac.set_ylabel('Effective fraction (\%)')
     axFrac.set_xlabel('$N/10^{5}$')
-    
+   
+    axn.set_xlim(0.,32.)
+    axT.set_xlim(0.,32.)
+    axU.set_xlim(0.,32.) 
     axSpiB.set_ylim(0.5,2.0)
     axFrac.set_ylim(-20., 60.)
 

@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.1415926-2.5-1.40.14 (TeX Live 2013/Debian) (format=pdflatex 2014.2.1)  20 JUN 2014 02:04
+This is pdfTeX, Version 3.1415926-2.5-1.40.14 (TeX Live 2013/Debian) (format=pdflatex 2014.2.1)  20 JUN 2014 23:12
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -621,37 +621,45 @@ Package pdftex.def Info: ../dataplots/QMC_Final/QMC_NLCE_Compare_U07.png used o
 n input line 227.
 (pdftex.def)             Requested size: 491.43513pt x 218.43268pt.
 
+<../dataplots/Basic00/density_varyT.png, id=42, 469.755pt x 158.994pt>
+File: ../dataplots/Basic00/density_varyT.png Graphic file (type png)
+
+<use ../dataplots/Basic00/density_varyT.png>
+Package pdftex.def Info: ../dataplots/Basic00/density_varyT.png used on input l
+ine 284.
+(pdftex.def)             Requested size: 491.43513pt x 166.3324pt.
+ [4] [5 <../dataplots/QMC_Final/density_All.png> <../dataplots/QMC_Final/spi_n_
+All.png> <../dataplots/QMC_Final/spi_n_n_All.png>] [6 <../dataplots/QMC_Final/Q
+MC_NLCE_Compare_U06.png> <../dataplots/QMC_Final/QMC_NLCE_Compare_U07.png>]
 No file compare_to_theory.bbl.
-[4] [5 <../dataplots/QMC_Final/density_All.png> <../dataplots/QMC_Final/spi_n_A
-ll.png> <../dataplots/QMC_Final/spi_n_n_All.png>] [6 <../dataplots/QMC_Final/QM
-C_NLCE_Compare_U06.png> <../dataplots/QMC_Final/QMC_NLCE_Compare_U07.png>]
-(./compare_to_theory.aux) ) 
+[7 <../dataplots/Basic00/density_varyT.png>] (./compare_to_theory.aux) ) 
 Here is how much of TeX's memory you used:
- 6609 strings out of 493307
- 100181 string characters out of 6139906
- 169692 words of memory out of 5000000
- 9892 multiletter control sequences out of 15000+600000
- 16462 words of font info for 61 fonts, out of 8000000 for 9000
+ 6624 strings out of 493307
+ 100511 string characters out of 6139906
+ 169700 words of memory out of 5000000
+ 9904 multiletter control sequences out of 15000+600000
+ 18322 words of font info for 68 fonts, out of 8000000 for 9000
  957 hyphenation exceptions out of 8191
  53i,8n,92p,304b,351s stack positions out of 5000i,500n,10000p,200000b,80000s
-</usr/share/texlive/texmf-dist/fonts/type1/public/am
-sfonts/cm/cmbx12.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts
-/cm/cmex10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cm
-mi10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi6.pf
-b></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi8.pfb></usr
-/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmib10.pfb></usr/shar
-e/texlive/texmf-dist/fonts/type1/public/amsfonts/cmextra/cmmib8.pfb></usr/share
-/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/share/texliv
-e/texmf-dist/fonts/type1/public/amsfonts/cm/cmr6.pfb></usr/share/texlive/texmf-
-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb></usr/share/texlive/texmf-dist/fon
-ts/type1/public/amsfonts/cm/cmr9.pfb></usr/share/texlive/texmf-dist/fonts/type1
-/public/amsfonts/cm/cmsy10.pfb></usr/share/texlive/texmf-dist/fonts/type1/publi
-c/amsfonts/cm/cmsy8.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfo
-nts/cm/cmtt9.pfb>
-Output written on compare_to_theory.pdf (6 pages, 1839634 bytes).
+</usr/s
+hare/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx12.pfb></usr/share/t
+exlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb></usr/share/texlive
+/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/share/texlive/texmf
+-dist/fonts/type1/public/amsfonts/cm/cmmi12.pfb></usr/share/texlive/texmf-dist/
+fonts/type1/public/amsfonts/cm/cmmi6.pfb></usr/share/texlive/texmf-dist/fonts/t
+ype1/public/amsfonts/cm/cmmi8.pfb></usr/share/texlive/texmf-dist/fonts/type1/pu
+blic/amsfonts/cm/cmmib10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/
+amsfonts/cmextra/cmmib8.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/a
+msfonts/cm/cmr10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts
+/cm/cmr6.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8
+.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr9.pfb></u
+sr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/sha
+re/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy8.pfb></usr/share/texl
+ive/texmf-dist/fonts/type1/public/amsfonts/cm/cmtt9.pfb>
+Output written on compare_to_theory.pdf (7 pages, 1941278 bytes).
 PDF statistics:
- 100 PDF objects out of 1000 (max. 8388607)
- 57 compressed objects within 1 object stream
+ 111 PDF objects out of 1000 (max. 8388607)
+ 64 compressed objects within 1 object stream
  0 named destinations out of 1000 (max. 500000)
- 51 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 56 words of extra memory for PDF output out of 10000 (max. 10000000)
 

@@ -41,20 +41,24 @@ def find_closest_nlce( U=8, T=0.67, mu=4., qty='dens', **kwargs):
     
     diff = T-Ts
 
+    error = False
+
     if np.all( diff < 0 ):
         print "Available temperatures do not make it this low:"
-        print " T = ", T 
-        raise ValueError("Temperature range error")
+        print " T = ", T
+        error = True  
+
+    if not error:    
+        order_pos =  np.argsort(np.abs( diff[diff>0] ))
+        order_neg =  np.argsort(np.abs( diff[diff<0] ))
+        Tpts = sorted( [  Ts[diff>0][ order_pos[0] ] ,  Ts[diff<0][ order_neg[0]] ] )  
+    else:
+        order = np.argsort( np.abs( diff ) ) 
+        Tpts = sorted( [ Ts[order[0]], Ts[order[1]], Ts[order[2]] ] ) 
+        #Ta = min(Ts[order[0]], Ts[order[1]])
+        #Tb = max(Ts[order[0]], Ts[order[1]])
+        #print "T in ", Ta, Tb
     
-    order_pos =  np.argsort(np.abs( diff[diff>0] ))
-    order_neg =  np.argsort(np.abs( diff[diff<0] ))
-    Tpts = sorted( [  Ts[diff>0][ order_pos[0] ] ,  Ts[diff<0][ order_neg[0]] ] )  
-
-    #Tpts = sorted( [ Ts[order[0]], Ts[order[1]], Ts[order[2]] ] ) 
-    #Ta = min(Ts[order[0]], Ts[order[1]])
-    #Tb = max(Ts[order[0]], Ts[order[1]])
-    #print "T in ", Ta, Tb
-
     datadir = '/home/pmd/sandbox/hubbard-lda/'
     datfiles = []
     for Uval in [Ua,Ub]:
@@ -74,11 +78,53 @@ def find_closest_nlce( U=8, T=0.67, mu=4., qty='dens', **kwargs):
             
     MUCOL = 0 
     basedat = [] 
+
+    qtyinterp = kwargs.get( 'qtyinterp', 'nearest' ) 
+
     for f in datfiles:
         try:
-            dat = np.loadtxt(f[0]) 
-            index = np.argmin( np.abs(dat[:, MUCOL] - mu )) 
-            basedat.append( [f[1], f[2], dat[index, COL]] )
+            dat = np.loadtxt(f[0])
+            if qtyinterp == 'nearest': 
+                index = np.argmin( np.abs(dat[:, MUCOL] - mu )) 
+                basedat.append( [f[1], f[2], dat[index, COL]] )
+            else:
+                # find the two closest chemical potentials that 
+                # stride the point  
+                mudat = dat[:,MUCOL] 
+
+                # since the mu's are ordered we can do:
+                index0 = np.where( mudat <=mu )[0][-1]     
+                index1 = np.where( mudat > mu )[0][0] 
+               
+                qty0 = dat[ index0, COL ] 
+                qty1 = dat[ index1, COL ] 
+   
+                mu0 = dat[ index0, MUCOL ] 
+                mu1 = dat[ index1, MUCOL ]
+
+                qtyresult =  qty0 +  (mu-mu0) * (qty1-qty0) / (mu1-mu0) 
+                basedat.append( [f[1], f[2], qtyresult] )
+
+                # not implemented yet: 
+                #if showqtyinterp: 
+                #    fig = plt.figure( figsize=(3.5,3.5))
+                #    gs = matplotlib.gridspec.GridSpec( 1,1 ,\
+                #            left=0.15, right=0.96, bottom=0.12, top=0.88)
+                #    ax = fig.add_subplot( gs[0] )
+                #    ax.grid(alpha=0.5)
+
+                #print
+                #print " mu = ", mu 
+                #print "index0 = ", index0
+                #print "index1 = ", index1
+                #print "Doing linear interpolation for the qty"
+                #print " mu0 = ", mu0 
+                #print " mu1 = ", mu1 
+                #print "qty0 = ", qty0 
+                #print "qty1 = ", qty1
+                #print "qtyresult = ", qtyresult
+
+                
         except:
             print "Failed to get data from file = ", f
             raise
@@ -87,13 +133,12 @@ def find_closest_nlce( U=8, T=0.67, mu=4., qty='dens', **kwargs):
     #print "Closest dat = ", basedat
     points = _ndim_coords_from_arrays(( basedat[:,0] , basedat[:,1]))
     
-
+    
     
     #finterp = CloughTocher2DInterpolator(points, basedat[:,2])
     finterp = LinearNDInterpolator( points, basedat[:,2] )
     
     
-    error = False
     try:
         result = finterp( U,T )
         if np.isnan(result):
@@ -136,6 +181,8 @@ def find_closest_nlce( U=8, T=0.67, mu=4., qty='dens', **kwargs):
     return result
 
 
+QTYINTERP = 'linear' 
+
 def nlce_dens( T, t, mu, U, ignoreLowT=False, verbose=True):
     U_ = U/t 
     T_ = T/t 
@@ -143,7 +190,8 @@ def nlce_dens( T, t, mu, U, ignoreLowT=False, verbose=True):
 
     result = np.empty_like(mu) 
     for i in range( len(mu_)):
-        result[i] = find_closest_nlce( U=U_[i], T=T_[i], mu=mu_[i], qty='dens' ) 
+        result[i] = find_closest_nlce( U=U_[i], T=T_[i], mu=mu_[i], \
+                     qty='dens',  qtyinterp=QTYINTERP  ) 
     return result     
  
 def nlce_entr( T, t, mu, U, ignoreLowT=False, verbose=True):
@@ -153,7 +201,8 @@ def nlce_entr( T, t, mu, U, ignoreLowT=False, verbose=True):
 
     result = np.empty_like(mu) 
     for i in range( len(mu_)):
-        result[i] = find_closest_nlce( U=U_[i], T=T_[i], mu=mu_[i], qty='entr' ) 
+        result[i] = find_closest_nlce( U=U_[i], T=T_[i], mu=mu_[i], \
+                     qty='entr', qtyinterp=QTYINTERP ) 
     return result     
 
 def nlce_spi( T, t, mu, U, ignoreLowT=False, verbose=True):
@@ -163,6 +212,7 @@ def nlce_spi( T, t, mu, U, ignoreLowT=False, verbose=True):
 
     result = np.empty_like(mu) 
     for i in range( len(mu_)):
-        result[i] = find_closest_nlce( U=U_[i], T=T_[i], mu=mu_[i], qty='spi' ) 
+        result[i] = find_closest_nlce( U=U_[i], T=T_[i], mu=mu_[i], \
+                     qty='spi', qtyinterp=QTYINTERP ) 
     return result     
 
