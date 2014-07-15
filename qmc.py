@@ -21,23 +21,144 @@ from scipy.interpolate import CloughTocher2DInterpolator, LinearNDInterpolator
 from scipy.interpolate.interpnd import _ndim_coords_from_arrays
 
 
-def find_closest_qmc( U=8, T=0.67, n=1.0, **kwargs):
+
+def get_qty_mu( dat, mu, MUCOL, COL, **kwargs ): 
+    # Control the interpolation between availble
+    # density points here 
+    #~qtyinterp = 'nearest' 
+    qtyinterp = 'linear'
+    msg = kwargs.get('msg', None)
+
+    ENTRCOL = 2  
+    SPICOL = 3
+    DENSCOL = 1  
+    if COL == SPICOL:
+        default_minus = 1.0 
+        default_plus  = 0.0  
+    elif COL == ENTRCOL:
+        default_minus = 0.0 
+        default_plus  = 0.0  
+    elif COL == DENSCOL:
+        default_minus = 0.0 
+        default_plus  = 2.0  
+    else:
+        raise ValueError("Column not defined: COL = {:d}".format(COL) ) 
+  
+
+    if qtyinterp == 'nearest': 
+        index = np.argmin( np.abs(dat[:, MUCOL] - mu )) 
+        qtyresult = dat[index,COL] 
+       
+    else:
+        # find the two closest chemical potentials that 
+        # stride the point  
+        mudat = dat[:,MUCOL]
+
+        verbose = False
+
+        if np.all(mu < mudat):
+            qtyresult = default_minus  
+ 
+            if COL == DENSCOL or COL == ENTRCOL:
+               if verbose:
+                   print "QTY=", COL,
+                   print "===>>> mu={:0.2f} ".format(mu), msg 
+               return 'out-of-bounds'
+
+               #print "====>>> BE CAREFUL :  Using default density" + \
+               #      " n=%.2f"%default_minus  + \
+               #      " at mu={:0.2f}  ".format(mu),
+               #if msg is not None:
+               #    print msg 
+               #raise ValueError('density error')
+
+        elif np.all( mu > mudat):
+            qtyresult = default_plus
+
+            if COL == DENSCOL or COL == ENTRCOL:
+               if verbose:
+                   print "QTY=", COL,
+                   print "====>>> mu={:0.2f} ".format(mu), msg 
+               return 'out-of-bounds'
+               #print "====>>> BE CAREFUL :  Using default density" + \
+               #      " n=%.2f"%default_plus  + \
+               #      " at mu={:0.2f}  ".format(mu),
+               #if msg is not None:
+               #    print msg 
+               #raise ValueError('density error')
+               return 'out-of-bounds'
+
+        else:
+            # since the mu's are ordered we can do:
+            index0 = np.where( mudat <=mu )[0][-1]     
+            index1 = np.where( mudat > mu )[0][0] 
+           
+            qty0 = dat[ index0, COL ] 
+            qty1 = dat[ index1, COL ] 
+    
+            mu0 = dat[ index0, MUCOL ] 
+            mu1 = dat[ index1, MUCOL ]
+    
+            qtyresult =  qty0 +  (mu-mu0) * (qty1-qty0) / (mu1-mu0)
+
+    return qtyresult  
+
+
+
+
+
+                #print
+                #print " mu = ", mu 
+                #print "index0 = ", index0
+                #print "index1 = ", index1
+                #print "Doing linear interpolation for the qty"
+                #print " mu0 = ", mu0 
+                #print " mu1 = ", mu1 
+                #print "qty0 = ", qty0 
+                #print "qty1 = ", qty1
+                #print "qtyresult = ", qtyresult
+
+
+def find_closest_qmc( U=8, T=0.67, mu=4.0, **kwargs):
     """
     This function finds the closest values of U and T in the QMC data 
     that straddle the values U and T given as arguments.
     
-    Notice that this one searches by density rather than by chemical
-    potential.  The NLCE find closest searches by chemical potential. 
     """
+
+    nUs = 4 
+    nTs = 3
+    ALLPTS = kwargs.get('ALLPTS', False) 
+
+    # select which quantity will be returned, options are
+    # spi and entropy
+    QTY = kwargs.get('QTY', 'spi' ) 
     
     #datadir = '/home/pmd/sandbox/hubbard-lda/QMC_Final/'
-    datadir = '/home/pmd/sandbox/hubbard-lda/COMBINED_Final/'
+    #datadir = '/home/pmd/sandbox/hubbard-lda/COMBINED_Final/'
+
+    if QTY == 'spi':
+        datadir = '/home/pmd/sandbox/hubbard-lda/COMB_Final_Spi/'
+    elif QTY == 'entropy':
+        datadir = '/home/pmd/sandbox/hubbard-lda/COMB_Final_Entr/'
+    elif QTY == 'density':
+        datadir = '/home/pmd/sandbox/hubbard-lda/COMB_Final_Spi/'
+    else:
+        raise ValueError('Quantity not defined:' + str(QTY) ) 
+         
+      
     
     fname = datadir + 'U*'
     us = [ float(u.split('/U')[-1]) for u in glob.glob(fname) ] 
     du = [ np.abs(U-u) for u in us ]
     index = np.argsort(du)
-    us = [ us[index[i]] for i in range(4)] 
+
+    if ALLPTS: 
+        Ulist0 = range(len(index)) 
+    else:
+        Ulist0 = range( nUs ) 
+
+    us = [ us[index[i]] for i in Ulist0] 
     #print us
     #print du
     #print index
@@ -46,10 +167,16 @@ def find_closest_qmc( U=8, T=0.67, n=1.0, **kwargs):
     datfiles = []
     for u in us:    
     
-        # For the Spi and Stheta data 
-        fname = datadir + 'U{U:02d}/T*dat'.format(U=int(u))
-        fs = sorted(glob.glob(fname))
-        Ts = [ float(f.split('T')[1].split('.dat')[0]) for f in fs ]
+        # For the Spi and Stheta data
+        if QTY == 'spi' or QTY == 'density':
+            fname = datadir + 'U{U:02d}/T*dat'.format(U=int(u))
+            fs = sorted(glob.glob(fname))
+            Ts = [ float(f.split('T')[1].split('.dat')[0]) for f in fs ]
+        elif QTY=='entropy':
+            fname = datadir + 'U{U:02d}/S*dat'.format(U=int(u))
+            fs = sorted(glob.glob(fname))
+            Ts = [ float(f.split('S')[1].split('.dat')[0]) for f in fs ]
+
 
         Ts_g = [] ; Ts_l = []; 
         for t in Ts:
@@ -64,18 +191,26 @@ def find_closest_qmc( U=8, T=0.67, n=1.0, **kwargs):
         try:
             Tpts = [ Ts_g[ order_g[0]] , Ts_l[ order_l[0]]   ] 
         except:
-            print 
-            print "problem adding U=",u, "T=",Ts
-            print "available T data does not stride the point"
-            print "T  =", T
-            print "Ts =", Ts
-            print  
-            raise ValueError("QMC data not available.")
+            #print 
+            #print "problem adding U=",u, "T=",Ts
+            #print "available T data does not stride the point"
+            #print "T  =", T
+            #print "Ts =", Ts
+            #print "will add nearest Ts nevertheless"
+            Tpts = [  ] 
+              
+            #raise ValueError("QMC data not available.")
 
 
         dT = [ np.abs( T - t) for t in Ts ] 
         index = np.argsort(dT)
-        for i in range( min(3, len(Ts))):
+ 
+        if ALLPTS: 
+            Tlist0 = range(len(Ts)) 
+        else:
+            Tlist0 = range( min(nTs , len(Ts)))
+   
+        for i in Tlist0:
             Tnew = Ts[index[i]] 
             if Tnew not in Tpts:
                 Tpts.append(Tnew) 
@@ -108,16 +243,17 @@ def find_closest_qmc( U=8, T=0.67, n=1.0, **kwargs):
             #datfiles.append( [ fs[index[1]], u, Ts[index[1]] ] ) 
         
     #print datfiles
-    DENSCOL = 1 
+    MUCOL = 0 
+    DENSCOL = 1
+    ENTRCOL = 2  
     SPICOL = 3 
-    SPIERR = 4
-    STHCOL = 5 
-    STHERR = 6 
-
-    # Control the interpolation between availble
-    # density points here 
-    #~spinterp = 'nearest' 
-    spinterp = 'linear' 
+  
+    if QTY == 'spi':
+        COL = SPICOL 
+    elif QTY == 'entropy':
+        COL = ENTRCOL 
+    elif QTY == 'density':
+        COL = DENSCOL 
        
  
     basedat = []
@@ -125,62 +261,92 @@ def find_closest_qmc( U=8, T=0.67, n=1.0, **kwargs):
         # f[0] is the datafile name
         # f[1] is U
         # f[2] is T 
-#        try:
-            dat = np.loadtxt( f[0], skiprows=1 ) 
-            if spinterp == 'nearest':
-                index = np.argmin( np.abs(dat[:, DENSCOL] - n )) 
-                basedat.append( [f[1], f[2], dat[index, SPICOL]] )
-            else:
-                # find the two closest densities that stride the point  
-                densdat = dat[:,DENSCOL] 
 
-                # since the densities are ordered we can do:
-                index0 = np.where( densdat <= n )[0][-1]     
-                index1 = np.where( densdat >  n )[0][0] 
-               
-                spi0 = dat[ index0, SPICOL ] 
-                spi1 = dat[ index1, SPICOL ] 
-   
-                dens0 = dat[ index0, DENSCOL ] 
-                dens1 = dat[ index1, DENSCOL ]
+        radius = kwargs.get('radius', np.nan ) 
+        msg = 'U={:0.2f}, T={:0.2f}'.format(U,T) + \
+               ' mu={:0.2f}, r={:0.2f}, Upt={:0.3f}, Tpt={:0.3f}'.\
+               format(mu, radius, f[1], f[2])
+ 
+        try:
+            dat = np.loadtxt(f[0])
+            spival = get_qty_mu( dat, mu, MUCOL, COL, msg=msg )
+            if spival == 'out-of-bounds':
+                continue 
+                #return 'out-of-bounds' 
+            basedat.append( [f[1], f[2], spival] )
+        except Exception as e :
+            print "Failed to get data from file = ", f
 
-                spiresult =  spi0 +  (n-dens0) * (spi1-spi0) / (dens1-dens0) 
-                basedat.append( [f[1], f[2], spiresult] )
+            # toggle plotting, not implemented yet: 
+            #if showqtyinterp: 
+            fig = plt.figure( figsize=(3.5,3.5))
+            gs = matplotlib.gridspec.GridSpec( 1,1 ,\
+                    left=0.15, right=0.96, bottom=0.12, top=0.88)
+            ax = fig.add_subplot( gs[0] )
+            ax.grid(alpha=0.5) 
+            ax.plot( dat[:,MUCOL], dat[:,COL], '.-') 
+            ax.axvline( mu )
 
-                print
-                print "U={:02d}, T={:0.2f}".format( int(f[1]), f[2] )
-                print "  dens = ", n
-                print "index0 = ", index0
-                print "index1 = ", index1
-                print "Doing linear interpolation for Spi"
-                print " dens0 = ", dens0
-                print " dens1 = ", dens1
-                print "  Spi0 = ", spi0
-                print "  Spi1 = ", spi1
-                print "spiresult = ", spiresult
-                raise
-#        except Exception as e :
-#            print "Failed to get data from file = ", f
-#            raise e 
-
-    basedat =   np.array(basedat)
-    points = _ndim_coords_from_arrays(( basedat[:,0] , basedat[:,1]))
-    #print "Closest dat = ", basedat
+            ax.text( 0.5, 1.05, msg, ha='center', va='bottom', \
+                transform=ax.transAxes) 
+            plt.show()
     
-    
-    #finterp = CloughTocher2DInterpolator(points, basedat[:,2])
-    finterp = LinearNDInterpolator( points, basedat[:,2] )
+           
+            raise e
+ 
         
     error = False
-    try:
-        result = finterp( U,T )
-        if np.isnan(result):
-            raise Exception("!!!! Invalid result !!!!\n")
-    except Exception as e:
+    try: 
+        basedat =   np.array(basedat)
+
+        Us = np.unique(basedat[:,0] )
+        Ts = np.unique(basedat[:,1] ) 
+        validTriang = not ( len(Us) ==1  or len(Ts) ==  1 ) 
+        #print "#Us={:d}, #Ts={:d}".format( len(Us), len(Ts) )  
+        #print msg 
+
+        if validTriang: 
+            points = _ndim_coords_from_arrays(( basedat[:,0] , basedat[:,1]))
+            #print "Closest dat = ", basedat
+            #finterp = CloughTocher2DInterpolator(points, basedat[:,2])
+            finterp = LinearNDInterpolator( points, basedat[:,2] )
+        else:
+            raise ValueError('not enough finterp points')
+
+    except Exception as e :
+        print "QTY=%s -> Interp Error:"%QTY, msg
         print e
-        error = True
+        error = True 
+
+    if error == False:
+        try:
+            result = finterp( U,T )
+            if np.isnan(result):
+                raise Exception("\n!!!! Invalid result, QTY:%s!!!!\n"%QTY)
+        except Exception as e:
+            if kwargs.get('error_nan', False):
+                return np.nan 
+            else:
+                print e
+                error = True
+
+    if error == False:
+        if result >= 8. and QTY == 'spi' :
+            print " Obtained Spi > 8. : U={:0.2f}, T={:0.2f}, mu={:0.2f}".\
+                   format( U, T, mu ),
+            print "  ==> Spi={:0.2f}".format(float(result))
+            error = True
+        elif result >=4. and QTY == 'entropy':
+            print " Obtained Ent > 4. : U={:0.2f}, T={:0.2f}, mu={:0.2f}".\
+                   format( U, T, mu ), 
+            print "  ==> Result={:0.2f}".format(float(result))
+            error = True
         
     if error or kwargs.get('showinterp',False):
+
+        if kwargs.get('error_nan', False):
+            return np.nan 
+
         print "Interp points:"
         print basedat
         
@@ -211,7 +377,8 @@ def find_closest_qmc( U=8, T=0.67, n=1.0, **kwargs):
             print "Saving png." 
             fig.savefig( save_err, dpi=300)
         plt.show()
-        raise ValueError("Could not interpolate using QMC data.")
+        if not kwargs.get('single', False):
+            raise ValueError("Could not interpolate using QMC data.")
     
     return result
 

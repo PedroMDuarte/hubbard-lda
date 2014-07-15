@@ -1,0 +1,15 @@
+# Data in NLCE_Final has the following columns: 
+
+mu	n	s	Spi	Spi/n
+
+
+# Data in QMC_Final has the following columns:
+
+mu	n	nerr	Spi/n	err	Sth/n	err	entropy  
+
+
+# Data in COMB_Final_Spi  and in COMB_Final_Entr *will have* the following 
+# columns:
+
+mu	n	s	Spi/n 
+

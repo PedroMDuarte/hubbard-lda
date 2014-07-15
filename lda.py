@@ -595,16 +595,85 @@ class lda:
 
         t0 = self.tunneling_111.min() 
         
-
         Tspi = kwargs.get( 'Tspi', self.T / t0  )
+        print "Tspi in units of t0 = ", Tspi 
         Tspi = Tspi * t0
+        print "Tspi in units of Er = ", Tspi
+        print "  t0 in units of Er = ", t0 
+    
 
-        spibulk, spi =  qmc_spi.spi_bulk( r111, n111, Tspi, \
-             self.tunneling_111, self.onsite_111, **kwargs ) 
+        gMuZero = self.Ezero0_111 + self.globalMu
+        localMu = gMuZero - self.Ezero_111
+        localMu_t = localMu / self.tunneling_111
+
+        # Get the bulk Spi and the Spi profile
+        # ALSO  
+        # Get the overall S/N and the s profiles,  both s per lattice site
+        # and s per particle  
+        spibulk, spi, overall_entropy, entropy, lda_number, density =  \
+             qmc_spi.spi_bulk( r111, n111, localMu_t, Tspi, \
+             self.tunneling_111, self.onsite_111, **kwargs )
+
 
         U111 = self.onsite_111 / self.tunneling_111
 
-        return spibulk, spi, r111, n111, U111, self.tunneling_111 
+        return spibulk, spi, r111, n111, U111, self.tunneling_111, \
+               overall_entropy, entropy, lda_number, density
+
+    def getSpiFineGrid( self, **kwargs):
+        direc111 = (np.arctan(np.sqrt(2)), np.pi/4)
+        unit = vec3(); th = direc111[0]; ph = direc111[1] 
+        unit.set_spherical( 1., th, ph); 
+
+        numpoints = kwargs.pop('numpoints', 80 ) 
+        t111, X111_, Y111_, Z111_, lims_ = \
+            udipole.linecut_points( direc=direc111, extents=self.extents,\
+            npoints=numpoints)
+        # Below we get the signed distance from the origin
+        r111_ =  X111_*unit[0] + Y111_*unit[1] + Z111_*unit[2]
+
+ 
+        # Obtain band structure and interactions along the 111 direction
+        bandbot_111_, bandtop_111_,  \
+        Ezero_111_, tunneling_111_, onsite_t_111_ = \
+            self.pot.bandStructure( X111_, Y111_, Z111_)
+
+
+        # The onsite interactions are scaled up by the scattering length
+        onsite_t_111_ = self.a_s * onsite_t_111_
+        onsite_111_ = onsite_t_111_ * tunneling_111_
+
+        # Lowst value of E0 is obtained 
+        LowestE0_ = np.amin( bandbot_111_ )  
+        Ezero0_111_ = Ezero_111_.min()
+
+        t0 = tunneling_111_.min() 
+        Tspi = kwargs.get( 'Tspi', self.T / t0  )
+        Tspi = Tspi * t0
+
+        localMu_ = self.globalMu +  Ezero0_111_ - Ezero_111_
+        localMu_t_ = localMu_ / tunneling_111_
+
+        # Get the density 
+        density_ = get_dens( self.T, tunneling_111_, localMu_, \
+                      onsite_111_, select=self.select,\
+                      ignoreLowT=self.ignoreLowT, \
+                      verbose=self.verbose)
+
+        # Get the bulk Spi and the Spi profile
+        # ALSO  
+        # Get the overall S/N and the s profiles,  both s per lattice site
+        # and s per particle  
+        spibulk, spi, overall_entropy, entropy, lda_number, density =  \
+             qmc_spi.spi_bulk( r111_, density_, localMu_t_, Tspi, \
+             tunneling_111_, onsite_111_, **kwargs )
+
+
+        U111 = onsite_111_ / tunneling_111_
+
+        #return spibulk, spi, r111, n111, U111, self.tunneling_111, \
+        #       overall_entropy, entropy, lda_number, density
+        return r111_, spi, density_
 
 
     def getNumber( self, gMu, T, **kwargs):
@@ -1857,3 +1926,122 @@ def CheckInhomogSimple( lda0, **kwargs ):
         return fig, peak_dens, peak_t, r111_, density_111, Ut_111 ,Tt_111
     else:
         return fig, peak_dens, peak_t
+
+
+def CheckInhomogTrap( lda0, **kwargs ):
+    """This function will make a plot along 111 of U, t, U/t, v0, W, and W/U 
+       (where W is the band gap) 
+
+       It is useful to assess the degree of inhomogeneity in our system"""
+    
+    # Prepare the figure
+    fig = plt.figure(figsize=(8.,4.2))
+    lattlabel = '\n'.join(  list( lda0.pot.Info() ) )
+    lattlabel = '\n'.join( [ i.split( r'$\mathrm{,}\ $' )[0].replace('s','v') \
+                                 for i in lda0.pot.Info() ] )
+ 
+
+    ldainfoA = '\n'.join(lda0.Info().split('\n')[:2])
+    ldainfoB = '\n'.join(lda0.Info().split('\n')[-2:])
+
+ 
+    fig.text( 0.05, 0.98,  lattlabel, ha='left', va='top', linespacing=1.2)
+    fig.text( 0.48, 0.98,  ldainfoA, ha='right', va='top', linespacing=1.2)
+    fig.text( 0.52, 0.98,  ldainfoB, ha='left', va='top', linespacing=1.2)
+
+    gs = matplotlib.gridspec.GridSpec( 2,4, wspace=0.18,\
+             left=0.1, right=0.9, bottom=0.05, top=0.98)
+    
+    # Setup axes
+    axU    = fig.add_subplot(gs[0,0])
+    axt    = fig.add_subplot(gs[0,1])
+    ax12t  = fig.add_subplot(gs[0,2])
+    axUt   = fig.add_subplot(gs[0,3])
+    axv0   = fig.add_subplot(gs[1,0])
+    axW    = fig.add_subplot(gs[1,1])
+    axWU   = fig.add_subplot(gs[1,2])
+    axW12t = fig.add_subplot(gs[1,3])
+    axs = [axU, axt, ax12t, axUt, axv0, axW, axWU, axW12t] 
+
+    # Set xlim
+    x0 = 0.; x1 = 40.
+    for ax in axs:
+        ax.set_xlim( x0, x1) 
+
+    # Set y labels
+    axU.set_ylabel(r'$U\,(E_{R})$')
+    axt.set_ylabel(r'$t\,(\mathrm{kHz})$')
+    ax12t.set_ylabel(r'$12t\,(E_{R})$')
+    axUt.set_ylabel(r'$U/t$')
+    axv0.set_ylabel(r'$v_{0}\,(E_{R})$')
+    axW.set_ylabel(r'$W\,(E_{R})$')
+    axWU.set_ylabel(r'$W/U$') 
+    axW12t.set_ylabel(r'$W/(12t)$') 
+ 
+    #axU.set_ylim( 0., np.amax( lda0.onsite_t_111 * lda0.tunneling_111 *1.05 ) )
+    
+    lw0 = 2.5
+
+
+
+    # U
+    U_111 = lda0.onsite_t_111 * lda0.tunneling_111
+    axU.plot( lda0.r111, U_111  , \
+                  lw=lw0, label='$U/t$', color='black') 
+    # t
+    t_111 = lda0.tunneling_111 
+    axt.plot( lda0.r111, t_111*29., \
+                  lw=lw0, label='$t$', color='black') 
+    # 12t
+    t_111 = lda0.tunneling_111 
+    ax12t.plot( lda0.r111, 12.*t_111 , \
+                  lw=lw0, label='$t$', color='black') 
+    # U/t
+    Ut_111 = lda0.onsite_t_111
+    axUt.plot( lda0.r111, Ut_111  , \
+                  lw=lw0, label='$U$', color='black') 
+    # v0 
+    V0_111 = lda0.pot.S0( lda0.X111, lda0.Y111, lda0.Z111 ) 
+    axv0.plot( lda0.r111, V0_111[0], lw=lw0, color='black', \
+               label='$\mathrm{Lattice\ depth}$')
+    # Band gap 
+    bandgap_111 = bands = scubic.bands3dvec( V0_111, NBand=1 )[0] \
+                          - scubic.bands3dvec( V0_111, NBand=0 )[1] 
+    axW.plot( lda0.r111, bandgap_111, lw=lw0, color='black', \
+                label='$\mathrm{Band\ gap},\,W$')   
+    # Band gap / U 
+    axWU.plot( lda0.r111, bandgap_111 / U_111, lw=lw0, color='black', \
+                label='$W/U$')   
+    # Band gap / 12t 
+    axW12t.plot( lda0.r111, bandgap_111 / (12.*t_111), lw=lw0, color='black', \
+                label='$W/(12t)$')   
+
+
+    letters = [\
+               r'\textbf{a}',\
+               r'\textbf{b}',\
+               r'\textbf{c}',\
+               r'\textbf{d}',\
+               r'\textbf{e}',\
+               r'\textbf{f}',\
+              ]
+    for i,ax in enumerate(axs):
+        #ax.text( 0.08,0.86, letters[i] , transform=ax.transAxes, fontsize=14)
+        ax.yaxis.grid()
+        ax.set_xlabel(r'$\mu\mathrm{m}$')
+            
+        ax.xaxis.set_major_locator( matplotlib.ticker.MultipleLocator(10) ) 
+        ax.xaxis.set_minor_locator( matplotlib.ticker.MultipleLocator(5) )
+        
+        #labels = [item.get_text() for item in ax.get_xticklabels()]
+        #print labels
+        #labels = ['' if float(l) % 40 != 0 else l for l in labels ] 
+        #ax.set_xticklabels(labels)
+
+    # Finalize figure
+    gs.tight_layout(fig, rect=[0.,0.0,1.0,0.94])
+
+    if kwargs.get('closefig', False):
+        plt.close()
+
+    return fig 

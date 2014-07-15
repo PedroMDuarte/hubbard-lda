@@ -33,7 +33,7 @@ def integrate_sphere( r, qty):
     # the radial integral has an implicit factor of 2. 
 
 
-def spi_bulk( r111, n111, T, t111, U111, **kwargs ): 
+def spi_bulk( r111, n111, mu111, T, t111, U111, **kwargs ): 
     """
     This function is used to calculate  the bulk
     spin structure factor using the QMC data
@@ -44,11 +44,23 @@ def spi_bulk( r111, n111, T, t111, U111, **kwargs ):
     t = t111.min() 
     print "Calculating Spi_Bulk for " + \
           "U={:0.2f}, T={:0.2f}".format(U/t, T/t)
+    print "Central chemical potential = ", mu111.max()
 
-    inhomog = kwargs.get('inhomog', False) 
+    inhomog = kwargs.get('inhomog', False)
+    spiextents = kwargs.get('spiextents', 100.) 
+    entextents = kwargs.get('entextents', 100.) 
 
-    spi = [] 
-    for i,n in enumerate(n111):
+    #subset = np.where( np.abs(r111) < spiextents )[0] 
+
+    spi = np.ones_like( mu111 ) 
+    entropy = np.zeros_like( mu111 ) 
+    density = np.zeros_like( mu111 )  
+
+    posr111 = np.abs(r111) 
+ 
+#    for i in subset:
+    for i in range(len(r111)):
+        mu = mu111[i] 
         # The corrrect thing to do here is 
         if inhomog == True:
             Uval = U111[i]/t111[i] 
@@ -59,21 +71,68 @@ def spi_bulk( r111, n111, T, t111, U111, **kwargs ):
             Uval = U/t 
             Tval = T/t 
 
+
         title_text = r'$(U/t)_{{0}}={:0.2f}$,\ '.format(Uval) \
-            + '$(T/t)_{{0}}={:0.2f}$,\ $n={:.2f}$'.format(Tval,n) + '\n'
-        result = qmc.find_closest_qmc( U=Uval, T=Tval, n=n, \
-                              title_text = title_text)
-        if result is None:
-            print "Had problems finding Spi for " +  \
-              " U={:02d}, T={:0.2f}".format(int(Uval), Tval)
-            continue
-        spi.append( result )
-    spi = np.array(spi)
+            + '$(T/t)_{{0}}={:0.2f}$,\ $\mu={:.2f}$,\ $r={:.2f}$'.\
+                       format(Tval,mu,r111[i]) + '\n'
+        
+
+        if posr111[i] <= spiextents:
+            # Find the Spi
+            result = qmc.find_closest_qmc( U=Uval, T=Tval, mu=mu, \
+                         title_text = title_text, radius=r111[i] )
+            if result is None:
+                print "Had problems finding Spi for " +  \
+                  " U={:02d}, T={:0.2f}".format(int(Uval), Tval)
+                continue
+            spi[ i ] =  result
+
+            # Find the density 
+            result = qmc.find_closest_qmc( U=Uval, T=Tval, mu=mu, \
+                                  title_text = title_text, \
+                         QTY='density', radius=r111[i], error_nan=True)
+            if result == 'out-of-bounds':
+                density[ i ] = np.nan
+                continue 
+            elif result is None:
+                print "Had problems finding Density for " +  \
+                  " U={:0.2f}, T={:0.2f}".format(Uval, Tval)
+                continue
+            density[ i ] =  result
+
+        else:
+            density[ i ] = np.nan 
+
+   
+        if posr111[i] <= entextents:
+            # Find the entropy 
+            result = qmc.find_closest_qmc( U=Uval, T=Tval, mu=mu, \
+                         title_text = title_text, radius=r111[i],\
+                         QTY='entropy', error_nan=True)
+            if result is None:
+                print "Had problems finding Entropy for " +  \
+                  " U={:0.2f}, T={:0.2f}".format(Uval, Tval)
+                continue
+            entropy[ i ] =  result 
+
+            if r111[i] > 20. and mu < 0. and result > 0.3:
+                print '==== ALERT HIGH ENTROPY ====' 
+                print 'r={:.1f}, U={:0.2f}, T={:0.3f}, mu={:0.3f}'.\
+                      format(r111[i],Uval, Tval, mu),
+                print '  ==> s={:0.2f}'.format( float(result ) )
+
+            
+        else: 
+            entropy[ i ] = np.nan
+ 
 
     number = integrate_sphere( r111, n111 ) 
     spibulk =  integrate_sphere( r111, spi * n111) / number 
+    overall_entropy = integrate_sphere( r111, entropy ) / number
 
-    return spibulk, spi
+    lda_number = integrate_sphere( r111, density ) 
+
+    return spibulk, spi, overall_entropy, entropy, lda_number, density
 
 
 

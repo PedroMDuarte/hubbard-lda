@@ -125,9 +125,9 @@ def find_closest_nlce( U=8, T=0.67, mu=4., qty='dens', **kwargs):
                 #print "qtyresult = ", qtyresult
 
                 
-        except:
+        except Exception as e:
             print "Failed to get data from file = ", f
-            raise
+            raise e 
         
     basedat =   np.array(basedat)
     #print "Closest dat = ", basedat
